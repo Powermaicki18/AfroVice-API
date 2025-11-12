@@ -1,0 +1,549 @@
+from datetime import datetime
+from typing import List, Optional
+
+from dotenv import load_dotenv
+import os
+
+from fastapi import FastAPI, Depends, HTTPException, status
+from pydantic import BaseModel, EmailStr
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import (
+    create_engine, Column, BigInteger, Integer, String, Text,
+    DateTime, ForeignKey
+)
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship, Session
+
+# ==========================
+# DATABASE CONFIG
+# ==========================
+
+# Load environment variables from .env
+load_dotenv()
+
+# Fetch variables
+USER = os.getenv("user")
+PASSWORD = os.getenv("password")
+HOST = os.getenv("host")
+PORT = os.getenv("port")
+DBNAME = os.getenv("dbname")
+
+DATABASE_URL = f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}"
+
+engine = create_engine(DATABASE_URL, echo=False)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+
+try:
+    # Attempt to acquire a connection and execute a simple statement
+    with engine.connect() as connection:
+        connection.execute("SELECT 1") # Use a simple, non-resource intensive query
+    print("Database connection successful!")
+except SQLAlchemyError as e:
+    # Catch any potential errors
+    print(f"An error occurred: {e}")
+    # You can access the underlying DBAPI exception for more details
+    print(f"DBAPI Error: {e.__cause__}")
+    print("Database connection failed.")
+
+def get_db() -> Session:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# ==========================
+# SQLALCHEMY MODELS
+# (must match your existing tables)
+# ==========================
+
+class Role(Base):
+    __tablename__ = "role"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    name = Column(String, nullable=False, unique=True)
+
+    users = relationship("User", back_populates="role")
+
+
+class User(Base):
+    __tablename__ = "user"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    name = Column(String, nullable=False)
+    email = Column(String, nullable=False)
+    password = Column(String, nullable=False)
+    role_id = Column(BigInteger, ForeignKey("role.id"), nullable=False)
+    photo = Column(String, nullable=True)
+
+    role = relationship("Role", back_populates="users")
+    tickets = relationship("Ticket", back_populates="user")
+    comments = relationship("Comment", back_populates="user")
+
+
+class MusicGender(Base):
+    __tablename__ = "music_gender"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    name = Column(String, nullable=False, unique=True)
+
+    artist_genders = relationship("ArtistGender", back_populates="music_gender")
+
+
+class Artist(Base):
+    __tablename__ = "artist"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    name = Column(String, nullable=False)
+    photo = Column(String, nullable=False)
+
+    genders = relationship("ArtistGender", back_populates="artist")
+    presentations = relationship("PresentationArtist", back_populates="artist")
+
+
+class ArtistGender(Base):
+    __tablename__ = "artist_gender"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    artist_id = Column(BigInteger, ForeignKey("artist.id"), nullable=False)
+    music_gender_id = Column(BigInteger, ForeignKey("music_gender.id"), nullable=False)
+
+    artist = relationship("Artist", back_populates="genders")
+    music_gender = relationship("MusicGender", back_populates="artist_genders")
+
+
+class Event(Base):
+    __tablename__ = "event"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    name = Column(String, nullable=True)
+    logo = Column(String, nullable=True)
+
+    presentations = relationship("Presentation", back_populates="event")
+
+
+class Presentation(Base):
+    __tablename__ = "presentation"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    event_id = Column(BigInteger, ForeignKey("event.id"), nullable=False)
+    date_start = Column(DateTime(timezone=False), nullable=False)
+    date_end = Column(DateTime(timezone=False), nullable=True)
+    flyer = Column(String, nullable=False)
+
+    event = relationship("Event", back_populates="presentations")
+    artists = relationship("PresentationArtist", back_populates="presentation")
+    tickets = relationship("Ticket", back_populates="presentation")
+    comments = relationship("Comment", back_populates="presentation")
+
+
+class PresentationArtist(Base):
+    __tablename__ = "presentation_artist"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    presentation_id = Column(BigInteger, ForeignKey("presentation.id"), nullable=False)
+    artist_id = Column(BigInteger, ForeignKey("artist.id"), nullable=False)
+    schedule = Column(DateTime(timezone=False), nullable=False)
+
+    presentation = relationship("Presentation", back_populates="artists")
+    artist = relationship("Artist", back_populates="presentations")
+
+
+class Ticket(Base):
+    __tablename__ = "ticket"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    user_id = Column(BigInteger, ForeignKey("user.id"), nullable=False)
+    presentation_id = Column(BigInteger, ForeignKey("presentation.id"), nullable=False)
+    price = Column(Integer, nullable=False)
+
+    user = relationship("User", back_populates="tickets")
+    presentation = relationship("Presentation", back_populates="tickets")
+
+
+class Comment(Base):
+    __tablename__ = "comment"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    message = Column(Text, nullable=False)
+    presentation_id = Column(BigInteger, ForeignKey("presentation.id"), nullable=True)
+    user_id = Column(BigInteger, ForeignKey("user.id"), nullable=True)
+
+    presentation = relationship("Presentation", back_populates="comments")
+    user = relationship("User", back_populates="comments")
+
+
+# ==========================
+# Pydantic SCHEMAS (DTOs)
+# ==========================
+
+# --- Role ---
+class RoleBase(BaseModel):
+    name: str
+
+
+class RoleCreate(RoleBase):
+    pass
+
+
+class RoleRead(RoleBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
+# --- User ---
+class UserBase(BaseModel):
+    name: str
+    email: EmailStr
+    photo: Optional[str] = None
+    role_id: int
+
+
+class UserCreate(UserBase):
+    password: str
+
+
+class UserRead(UserBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
+# --- MusicGender ---
+class MusicGenderBase(BaseModel):
+    name: str
+
+
+class MusicGenderCreate(MusicGenderBase):
+    pass
+
+
+class MusicGenderRead(MusicGenderBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
+# --- Artist ---
+class ArtistBase(BaseModel):
+    name: str
+    photo: str
+
+
+class ArtistCreate(ArtistBase):
+    pass
+
+
+class ArtistRead(ArtistBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
+# --- Event ---
+class EventBase(BaseModel):
+    name: Optional[str] = None
+    logo: Optional[str] = None
+
+
+class EventCreate(EventBase):
+    pass
+
+
+class EventRead(EventBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
+# --- Presentation ---
+class PresentationBase(BaseModel):
+    event_id: int
+    date_start: datetime
+    date_end: Optional[datetime] = None
+    flyer: str
+
+
+class PresentationCreate(PresentationBase):
+    pass
+
+
+class PresentationRead(PresentationBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
+# --- Ticket ---
+class TicketBase(BaseModel):
+    user_id: int
+    presentation_id: int
+    price: int
+
+
+class TicketCreate(TicketBase):
+    pass
+
+
+class TicketRead(TicketBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
+# --- Comment ---
+class CommentBase(BaseModel):
+    message: str
+    presentation_id: Optional[int] = None
+    user_id: Optional[int] = None
+
+
+class CommentCreate(CommentBase):
+    pass
+
+
+class CommentRead(CommentBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
+# ==========================
+# FASTAPI APP
+# ==========================
+
+app = FastAPI(title="AfroVice API", version="1.0.0")
+
+
+# ==========================
+# ROLE ENDPOINTS
+# ==========================
+
+@app.get("/roles", response_model=List[RoleRead])
+def list_roles(db: Session = Depends(get_db)):
+    return db.query(Role).all()
+
+
+@app.post("/roles", response_model=RoleRead, status_code=status.HTTP_201_CREATED)
+def create_role(role: RoleCreate, db: Session = Depends(get_db)):
+    db_role = Role(
+        name=role.name,
+        created_at=datetime.utcnow()
+    )
+    db.add(db_role)
+    db.commit()
+    db.refresh(db_role)
+    return db_role
+
+
+# ==========================
+# USER ENDPOINTS
+# ==========================
+
+@app.get("/users", response_model=List[UserRead])
+def list_users(db: Session = Depends(get_db)):
+    return db.query(User).all()
+
+
+@app.get("/users/{user_id}", response_model=UserRead)
+def get_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+@app.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = User(
+        name=user.name,
+        email=user.email,
+        password=user.password,  # in real life: hash this!
+        role_id=user.role_id,
+        photo=user.photo,
+        created_at=datetime.utcnow()
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+# ==========================
+# MUSIC GENDER ENDPOINTS
+# ==========================
+
+@app.get("/genders", response_model=List[MusicGenderRead])
+def list_music_genders(db: Session = Depends(get_db)):
+    return db.query(MusicGender).all()
+
+
+@app.post("/genders", response_model=MusicGenderRead, status_code=status.HTTP_201_CREATED)
+def create_music_gender(gender: MusicGenderCreate, db: Session = Depends(get_db)):
+    db_gender = MusicGender(
+        name=gender.name,
+        created_at=datetime.utcnow()
+    )
+    db.add(db_gender)
+    db.commit()
+    db.refresh(db_gender)
+    return db_gender
+
+
+# ==========================
+# ARTIST ENDPOINTS
+# ==========================
+
+@app.get("/artists", response_model=List[ArtistRead])
+def list_artists(db: Session = Depends(get_db)):
+    return db.query(Artist).all()
+
+
+@app.get("/artists/{artist_id}", response_model=ArtistRead)
+def get_artist(artist_id: int, db: Session = Depends(get_db)):
+    artist = db.query(Artist).get(artist_id)
+    if not artist:
+        raise HTTPException(status_code=404, detail="Artist not found")
+    return artist
+
+
+@app.post("/artists", response_model=ArtistRead, status_code=status.HTTP_201_CREATED)
+def create_artist(artist: ArtistCreate, db: Session = Depends(get_db)):
+    db_artist = Artist(
+        name=artist.name,
+        photo=artist.photo,
+        created_at=datetime.utcnow()
+    )
+    db.add(db_artist)
+    db.commit()
+    db.refresh(db_artist)
+    return db_artist
+
+
+# ==========================
+# EVENT ENDPOINTS
+# ==========================
+
+@app.get("/events", response_model=List[EventRead])
+def list_events(db: Session = Depends(get_db)):
+    return db.query(Event).all()
+
+
+@app.get("/events/{event_id}", response_model=EventRead)
+def get_event(event_id: int, db: Session = Depends(get_db)):
+    event = db.query(Event).get(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return event
+
+
+@app.post("/events", response_model=EventRead, status_code=status.HTTP_201_CREATED)
+def create_event(event: EventCreate, db: Session = Depends(get_db)):
+    db_event = Event(
+        name=event.name,
+        logo=event.logo,
+        created_at=datetime.utcnow()
+    )
+    db.add(db_event)
+    db.commit()
+    db.refresh(db_event)
+    return db_event
+
+
+# ==========================
+# PRESENTATION ENDPOINTS
+# ==========================
+
+@app.get("/presentations", response_model=List[PresentationRead])
+def list_presentations(db: Session = Depends(get_db)):
+    return db.query(Presentation).all()
+
+
+@app.get("/presentations/{presentation_id}", response_model=PresentationRead)
+def get_presentation(presentation_id: int, db: Session = Depends(get_db)):
+    pres = db.query(Presentation).get(presentation_id)
+    if not pres:
+        raise HTTPException(status_code=404, detail="Presentation not found")
+    return pres
+
+
+@app.post("/presentations", response_model=PresentationRead, status_code=status.HTTP_201_CREATED)
+def create_presentation(presentation: PresentationCreate, db: Session = Depends(get_db)):
+    db_pres = Presentation(
+        event_id=presentation.event_id,
+        date_start=presentation.date_start,
+        date_end=presentation.date_end,
+        flyer=presentation.flyer,
+        created_at=datetime.utcnow()
+    )
+    db.add(db_pres)
+    db.commit()
+    db.refresh(db_pres)
+    return db_pres
+
+
+# ==========================
+# TICKET ENDPOINTS
+# ==========================
+
+@app.get("/tickets", response_model=List[TicketRead])
+def list_tickets(db: Session = Depends(get_db)):
+    return db.query(Ticket).all()
+
+
+@app.post("/tickets", response_model=TicketRead, status_code=status.HTTP_201_CREATED)
+def create_ticket(ticket: TicketCreate, db: Session = Depends(get_db)):
+    db_ticket = Ticket(
+        user_id=ticket.user_id,
+        presentation_id=ticket.presentation_id,
+        price=ticket.price,
+        created_at=datetime.utcnow()
+    )
+    db.add(db_ticket)
+    db.commit()
+    db.refresh(db_ticket)
+    return db_ticket
+
+
+# ==========================
+# COMMENT ENDPOINTS
+# ==========================
+
+@app.get("/comments", response_model=List[CommentRead])
+def list_comments(db: Session = Depends(get_db)):
+    return db.query(Comment).all()
+
+
+@app.post("/comments", response_model=CommentRead, status_code=status.HTTP_201_CREATED)
+def create_comment(comment: CommentCreate, db: Session = Depends(get_db)):
+    db_comment = Comment(
+        message=comment.message,
+        presentation_id=comment.presentation_id,
+        user_id=comment.user_id,
+        created_at=datetime.utcnow()
+    )
+    db.add(db_comment)
+    db.commit()
+    db.refresh(db_comment)
+    return db_comment
