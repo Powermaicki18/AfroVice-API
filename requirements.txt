@@ -1,7 +1,7 @@
-fastapi
-uvicorn
-sqlalchemy
-psycopg2-binary
-python-multipart
-pydantic[email]
-python-dotenv
+fastapi==0.121.2
+uvicorn==0.38.0
+sqlalchemy==2.0.44
+psycopg2-binary==2.9.11
+python-multipart==0.0.20
+pydantic[email]==2.12.4
+python-dotenv==1.2.1
