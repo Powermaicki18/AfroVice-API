@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 import os
 
 from fastapi import FastAPI, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
-from sqlalchemy.exc import SQLAlchemyError
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, EmailStr, ConfigDict
 from sqlalchemy import (
     create_engine, Column, BigInteger, Integer, String, Text,
     DateTime, ForeignKey
@@ -29,22 +29,12 @@ DBNAME = os.getenv("dbname")
 
 DATABASE_URL = f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}"
 
+print(DATABASE_URL)
+
 engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-
-try:
-    # Attempt to acquire a connection and execute a simple statement
-    with engine.connect() as connection:
-        connection.execute("SELECT 1") # Use a simple, non-resource intensive query
-    print("Database connection successful!")
-except SQLAlchemyError as e:
-    # Catch any potential errors
-    print(f"An error occurred: {e}")
-    # You can access the underlying DBAPI exception for more details
-    print(f"DBAPI Error: {e.__cause__}")
-    print("Database connection failed.")
 
 def get_db() -> Session:
     db = SessionLocal()
@@ -56,11 +46,11 @@ def get_db() -> Session:
 
 # ==========================
 # SQLALCHEMY MODELS
-# (must match your existing tables)
+# (match your existing tables EXACTLY)
 # ==========================
 
 class Role(Base):
-    __tablename__ = "role"
+    __tablename__ = "Role"  # matches CREATE TABLE public."Role"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
@@ -70,14 +60,14 @@ class Role(Base):
 
 
 class User(Base):
-    __tablename__ = "user"
+    __tablename__ = "User"  # matches "User"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
     name = Column(String, nullable=False)
     email = Column(String, nullable=False)
     password = Column(String, nullable=False)
-    role_id = Column(BigInteger, ForeignKey("role.id"), nullable=False)
+    role_id = Column(BigInteger, ForeignKey("Role.id"), nullable=False)
     photo = Column(String, nullable=True)
 
     role = relationship("Role", back_populates="users")
@@ -86,7 +76,7 @@ class User(Base):
 
 
 class MusicGender(Base):
-    __tablename__ = "music_gender"
+    __tablename__ = "Music_Gender"  # matches "Music_Gender"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
@@ -96,7 +86,7 @@ class MusicGender(Base):
 
 
 class Artist(Base):
-    __tablename__ = "artist"
+    __tablename__ = "Artist"  # matches "Artist"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
@@ -108,19 +98,19 @@ class Artist(Base):
 
 
 class ArtistGender(Base):
-    __tablename__ = "artist_gender"
+    __tablename__ = "Artist_Gender"  # matches "Artist_Gender"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
-    artist_id = Column(BigInteger, ForeignKey("artist.id"), nullable=False)
-    music_gender_id = Column(BigInteger, ForeignKey("music_gender.id"), nullable=False)
+    artist_id = Column(BigInteger, ForeignKey("Artist.id"), nullable=False)
+    music_gender_id = Column(BigInteger, ForeignKey("Music_Gender.id"), nullable=False)
 
     artist = relationship("Artist", back_populates="genders")
     music_gender = relationship("MusicGender", back_populates="artist_genders")
 
 
 class Event(Base):
-    __tablename__ = "event"
+    __tablename__ = "Event"  # matches "Event"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
@@ -131,11 +121,11 @@ class Event(Base):
 
 
 class Presentation(Base):
-    __tablename__ = "presentation"
+    __tablename__ = "Presentation"  # matches "Presentation"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
-    event_id = Column(BigInteger, ForeignKey("event.id"), nullable=False)
+    event_id = Column(BigInteger, ForeignKey("Event.id"), nullable=False)
     date_start = Column(DateTime(timezone=False), nullable=False)
     date_end = Column(DateTime(timezone=False), nullable=True)
     flyer = Column(String, nullable=False)
@@ -147,12 +137,12 @@ class Presentation(Base):
 
 
 class PresentationArtist(Base):
-    __tablename__ = "presentation_artist"
+    __tablename__ = "Presentation_Artist"  # matches "Presentation_Artist"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
-    presentation_id = Column(BigInteger, ForeignKey("presentation.id"), nullable=False)
-    artist_id = Column(BigInteger, ForeignKey("artist.id"), nullable=False)
+    presentation_id = Column(BigInteger, ForeignKey("Presentation.id"), nullable=False)
+    artist_id = Column(BigInteger, ForeignKey("Artist.id"), nullable=False)
     schedule = Column(DateTime(timezone=False), nullable=False)
 
     presentation = relationship("Presentation", back_populates="artists")
@@ -160,12 +150,12 @@ class PresentationArtist(Base):
 
 
 class Ticket(Base):
-    __tablename__ = "ticket"
+    __tablename__ = "Ticket"  # matches "Ticket"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
-    user_id = Column(BigInteger, ForeignKey("user.id"), nullable=False)
-    presentation_id = Column(BigInteger, ForeignKey("presentation.id"), nullable=False)
+    user_id = Column(BigInteger, ForeignKey("User.id"), nullable=False)
+    presentation_id = Column(BigInteger, ForeignKey("Presentation.id"), nullable=False)
     price = Column(Integer, nullable=False)
 
     user = relationship("User", back_populates="tickets")
@@ -173,23 +163,22 @@ class Ticket(Base):
 
 
 class Comment(Base):
-    __tablename__ = "comment"
+    __tablename__ = "Comment"  # matches "Comment"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
     message = Column(Text, nullable=False)
-    presentation_id = Column(BigInteger, ForeignKey("presentation.id"), nullable=True)
-    user_id = Column(BigInteger, ForeignKey("user.id"), nullable=True)
+    presentation_id = Column(BigInteger, ForeignKey("Presentation.id"), nullable=True)
+    user_id = Column(BigInteger, ForeignKey("User.id"), nullable=True)
 
     presentation = relationship("Presentation", back_populates="comments")
     user = relationship("User", back_populates="comments")
 
 
 # ==========================
-# Pydantic SCHEMAS (DTOs)
+# Pydantic SCHEMAS (Pydantic v2)
 # ==========================
 
-# --- Role ---
 class RoleBase(BaseModel):
     name: str
 
@@ -200,12 +189,9 @@ class RoleCreate(RoleBase):
 
 class RoleRead(RoleBase):
     id: int
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-# --- User ---
 class UserBase(BaseModel):
     name: str
     email: EmailStr
@@ -219,12 +205,9 @@ class UserCreate(UserBase):
 
 class UserRead(UserBase):
     id: int
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-# --- MusicGender ---
 class MusicGenderBase(BaseModel):
     name: str
 
@@ -235,12 +218,9 @@ class MusicGenderCreate(MusicGenderBase):
 
 class MusicGenderRead(MusicGenderBase):
     id: int
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-# --- Artist ---
 class ArtistBase(BaseModel):
     name: str
     photo: str
@@ -252,12 +232,9 @@ class ArtistCreate(ArtistBase):
 
 class ArtistRead(ArtistBase):
     id: int
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-# --- Event ---
 class EventBase(BaseModel):
     name: Optional[str] = None
     logo: Optional[str] = None
@@ -269,12 +246,9 @@ class EventCreate(EventBase):
 
 class EventRead(EventBase):
     id: int
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-# --- Presentation ---
 class PresentationBase(BaseModel):
     event_id: int
     date_start: datetime
@@ -288,12 +262,9 @@ class PresentationCreate(PresentationBase):
 
 class PresentationRead(PresentationBase):
     id: int
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-# --- Ticket ---
 class TicketBase(BaseModel):
     user_id: int
     presentation_id: int
@@ -306,12 +277,9 @@ class TicketCreate(TicketBase):
 
 class TicketRead(TicketBase):
     id: int
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-# --- Comment ---
 class CommentBase(BaseModel):
     message: str
     presentation_id: Optional[int] = None
@@ -324,16 +292,29 @@ class CommentCreate(CommentBase):
 
 class CommentRead(CommentBase):
     id: int
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================
-# FASTAPI APP
+# FASTAPI APP + CORS
 # ==========================
 
 app = FastAPI(title="AfroVice API", version="1.0.0")
+
+origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 
 # ==========================
@@ -368,7 +349,7 @@ def list_users(db: Session = Depends(get_db)):
 
 @app.get("/users/{user_id}", response_model=UserRead)
 def get_user(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(User).get(user_id)
+    user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
@@ -379,7 +360,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db_user = User(
         name=user.name,
         email=user.email,
-        password=user.password,  # in real life: hash this!
+        password=user.password,  # ⚠️ in prod: hash this
         role_id=user.role_id,
         photo=user.photo,
         created_at=datetime.utcnow()
@@ -422,7 +403,7 @@ def list_artists(db: Session = Depends(get_db)):
 
 @app.get("/artists/{artist_id}", response_model=ArtistRead)
 def get_artist(artist_id: int, db: Session = Depends(get_db)):
-    artist = db.query(Artist).get(artist_id)
+    artist = db.get(Artist, artist_id)
     if not artist:
         raise HTTPException(status_code=404, detail="Artist not found")
     return artist
@@ -452,7 +433,7 @@ def list_events(db: Session = Depends(get_db)):
 
 @app.get("/events/{event_id}", response_model=EventRead)
 def get_event(event_id: int, db: Session = Depends(get_db)):
-    event = db.query(Event).get(event_id)
+    event = db.get(Event, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     return event
@@ -482,7 +463,7 @@ def list_presentations(db: Session = Depends(get_db)):
 
 @app.get("/presentations/{presentation_id}", response_model=PresentationRead)
 def get_presentation(presentation_id: int, db: Session = Depends(get_db)):
-    pres = db.query(Presentation).get(presentation_id)
+    pres = db.get(Presentation, presentation_id)
     if not pres:
         raise HTTPException(status_code=404, detail="Presentation not found")
     return pres
@@ -547,3 +528,4 @@ def create_comment(comment: CommentCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_comment)
     return db_comment
+
