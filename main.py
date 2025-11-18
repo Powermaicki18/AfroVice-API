@@ -113,6 +113,7 @@ class Event(Base):
     created_at = Column(DateTime(timezone=True), nullable=False)
     name = Column(String, nullable=True)
     logo = Column(String, nullable=True)
+    price = Column(Integer, nullable=False)
 
     presentations = relationship("Presentation", back_populates="event")
 
@@ -153,7 +154,6 @@ class Ticket(Base):
     created_at = Column(DateTime(timezone=True), nullable=False)
     user_id = Column(BigInteger, ForeignKey("User.id"), nullable=False)
     presentation_id = Column(BigInteger, ForeignKey("Presentation.id"), nullable=False)
-    price = Column(Integer, nullable=False)
 
     user = relationship("User", back_populates="tickets")
     presentation = relationship("Presentation", back_populates="tickets")
@@ -235,6 +235,7 @@ class ArtistRead(ArtistBase):
 class EventBase(BaseModel):
     name: Optional[str] = None
     logo: Optional[str] = None
+    price: int
 
 
 class EventCreate(EventBase):
@@ -265,7 +266,6 @@ class PresentationRead(PresentationBase):
 class TicketBase(BaseModel):
     user_id: int
     presentation_id: int
-    price: int
 
 
 class TicketCreate(TicketBase):
@@ -457,6 +457,7 @@ def create_event(event: EventCreate, db: Session = Depends(get_db)):
     db_event = Event(
         name=event.name,
         logo=event.logo,
+        price=event.price,
         created_at=datetime.utcnow()
     )
     db.add(db_event)
@@ -511,7 +512,6 @@ def create_ticket(ticket: TicketCreate, db: Session = Depends(get_db)):
     db_ticket = Ticket(
         user_id=ticket.user_id,
         presentation_id=ticket.presentation_id,
-        price=ticket.price,
         created_at=datetime.utcnow()
     )
     db.add(db_ticket)
