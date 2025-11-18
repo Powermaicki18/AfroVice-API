@@ -44,11 +44,10 @@ def get_db() -> Session:
 
 # ==========================
 # SQLALCHEMY MODELS
-# (match your existing tables EXACTLY)
 # ==========================
 
 class Role(Base):
-    __tablename__ = "Role"  # matches CREATE TABLE public."Role"
+    __tablename__ = "Role"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
@@ -58,7 +57,7 @@ class Role(Base):
 
 
 class User(Base):
-    __tablename__ = "User"  # matches "User"
+    __tablename__ = "User"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
@@ -74,7 +73,7 @@ class User(Base):
 
 
 class MusicGender(Base):
-    __tablename__ = "Music_Gender"  # matches "Music_Gender"
+    __tablename__ = "Music_Gender"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
@@ -84,7 +83,7 @@ class MusicGender(Base):
 
 
 class Artist(Base):
-    __tablename__ = "Artist"  # matches "Artist"
+    __tablename__ = "Artist"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
@@ -96,7 +95,7 @@ class Artist(Base):
 
 
 class ArtistGender(Base):
-    __tablename__ = "Artist_Gender"  # matches "Artist_Gender"
+    __tablename__ = "Artist_Gender"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
@@ -108,7 +107,7 @@ class ArtistGender(Base):
 
 
 class Event(Base):
-    __tablename__ = "Event"  # matches "Event"
+    __tablename__ = "Event"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
@@ -119,7 +118,7 @@ class Event(Base):
 
 
 class Presentation(Base):
-    __tablename__ = "Presentation"  # matches "Presentation"
+    __tablename__ = "Presentation"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
@@ -135,7 +134,7 @@ class Presentation(Base):
 
 
 class PresentationArtist(Base):
-    __tablename__ = "Presentation_Artist"  # matches "Presentation_Artist"
+    __tablename__ = "Presentation_Artist"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
@@ -148,7 +147,7 @@ class PresentationArtist(Base):
 
 
 class Ticket(Base):
-    __tablename__ = "Ticket"  # matches "Ticket"
+    __tablename__ = "Ticket"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
@@ -161,7 +160,7 @@ class Ticket(Base):
 
 
 class Comment(Base):
-    __tablename__ = "Comment"  # matches "Comment"
+    __tablename__ = "Comment"
 
     id = Column(BigInteger, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
