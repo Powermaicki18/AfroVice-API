@@ -553,3 +553,13 @@ def create_comment(comment: CommentCreate, db: Session = Depends(get_db)):
     db.refresh(db_comment)
     return db_comment
 
+@app.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_comment(comment_id: int, db: Session = Depends(get_db)):
+    comment = db.get(Comment, comment_id)
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    db.delete(comment)
+    db.commit()
+
+    return
