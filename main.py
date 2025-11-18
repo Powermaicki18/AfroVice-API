@@ -11,7 +11,7 @@ from sqlalchemy import (
     create_engine, Column, BigInteger, Integer, String, Text,
     DateTime, ForeignKey
 )
-from sqlalchemy.orm import sessionmaker, declarative_base, relationship, Session
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship, Session, joinedload
 
 # ==========================
 # DATABASE CONFIG
@@ -287,8 +287,13 @@ class CommentCreate(CommentBase):
     pass
 
 
-class CommentRead(CommentBase):
+class CommentRead(BaseModel):
     id: int
+    message: str
+    created_at: datetime
+    user: Optional[UserRead] = None
+    presentation: Optional[PresentationRead] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -526,7 +531,15 @@ def create_ticket(ticket: TicketCreate, db: Session = Depends(get_db)):
 
 @app.get("/comments", response_model=List[CommentRead])
 def list_comments(db: Session = Depends(get_db)):
-    return db.query(Comment).all()
+    comments = (
+        db.query(Comment)
+        .options(
+            joinedload(Comment.user),
+            joinedload(Comment.presentation),
+        )
+        .all()
+    )
+    return comments
 
 
 @app.post("/comments", response_model=CommentRead, status_code=status.HTTP_201_CREATED)
