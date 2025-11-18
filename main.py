@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import os
 
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, ConfigDict
 from sqlalchemy import (
     create_engine, Column, BigInteger, Integer, String, Text,
@@ -301,6 +302,23 @@ class CommentRead(BaseModel):
 # ==========================
 
 app = FastAPI(title="AfroVice API", version="1.0.0")
+
+origins = [
+    "http://localhost:5173",
+    "https://afrovice.maaango.com",
+    "https://afrovice-api.maaango.com",
+]
+
+vercel_regex = r"^https://.*\.vercel\.app$"
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_origin_regex=vercel_regex,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ==========================
 # HEALTH-CHECK ENDPOINTS
